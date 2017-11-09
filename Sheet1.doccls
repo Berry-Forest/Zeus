@@ -1,0 +1,6 @@
+﻿Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+
+'If NotesOpen = 1 And ActiveSheet.Name = "Line Item Data" Then NoteCatTitle.Text = ActiveCell.Offset(0, Range("N1").Column - ActiveCell.Column).Value
+
+
+End Sub

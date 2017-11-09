@@ -1,0 +1,235 @@
+﻿'Private XLApp As CExcelEvents
+
+Sub workbook_open()
+
+'
+''*check current version folder on shared drive to see if diff version than this version
+''*if it's a diff version then open the current version
+''*if current version matches this version but is not in XLSTART then trigger update
+''*******************************************************************************************
+
+
+
+'On Error GoTo 0
+
+    'Set Path Variables
+    '===================================================================================================
+    On Error GoTo ERR_NoPath
+    ZeusStartTime = Time
+    errbkmrk = "Set Path Variables"
+
+    Call SetPathVariables  '>>>>>>>>>>
+    'Call SetNetsArray      '>>>>>>>>>>
+    AppNm = FUN_ConvTags(AdminconfigStr, "App")
+    OldAppNm = FUN_ConvTags(AdminconfigStr, "Old App")
+
+    'If LCase(Usr) = "bforrest" Then GoTo ZeusSwitch
+
+    'Open new App and close current App
+    '===================================================================================================
+    If Not ThisWorkbook.Name = AppNm Then
+
+        'check to make sure not already open
+        '-------------------------------------
+        On Error GoTo ERR_NoWB
+        Set objFSO = CreateObject("Scripting.FileSystemObject")
+        Set objFolder = objFSO.GetFolder("C:\Users\" & Usr & "\AppData\Roaming\Microsoft\Excel\XLSTART")
+        For Each Wb In objFolder.Files
+            If InStr(Wb.Name, AppNm) > 0 And InStr(Wb.Name, "~$") > 0 Then openflg = 1
+        Next
+
+        'open current app version and close this version
+        '-------------------------------------
+OpenNew: On Error GoTo ERR_NoPath
+        errbkmrk = "Open New App"
+        If Not openflg = 1 Then Workbooks.Open (SupplyNetPATH & "\Zeus\Prod\Prod1\App\" & AppNm)
+        ThisWorkbook.Close
+        Exit Sub
+
+    End If
+
+    'Check for App and component updates
+    '===================================================================================================
+    Application.StatusBar = "Updating Zeus Components...Please wait"
+    CpyFldrScript = SupplyNetPATH & "\Zeus\Prod\Prod1\Admin\Scripts\Copy_Folder.vbs"
+    CpyFileScript = SupplyNetPATH & "\Zeus\Prod\Prod1\Admin\Scripts\Copy_File.vbs"
+
+AppUpdate:  On Error GoTo ERR_AppUpdate
+            If Dir("C:\Users\" & Usr & "\AppData\Roaming\Microsoft\Excel\XLSTART\" & AppNm, vbDirectory) = vbNullString Then
+                ThisWorkbook.SaveAs Filename:="C:\Users\" & Usr & "\AppData\Roaming\Microsoft\Excel\XLSTART\" & ThisWorkbook.Name, FileFormat:=xlOpenXMLAddIn
+                If Not Dir("C:\Users\" & Usr & "\AppData\Roaming\Microsoft\Excel\XLSTART\" & ThisWorkbook.Name, vbDirectory) = vbNullString Then AppSuccess = True
+            Else
+                AppSuccess = "Already Present"
+            End If
+
+FldrSetup:  On Error GoTo ERR_FldrSetup
+            Application.DisplayAlerts = False
+            If Dir(ZeusPATH, vbDirectory) = vbNullString Then MkDir ZeusPATH
+            If Dir(ZeusPATH & "\Components", vbDirectory) = vbNullString Then
+                MkDir ZeusPATH & "\Components"
+                Set fso = CreateObject("scripting.filesystemobject")
+                fso.CopyFolder Source:=SupplyNetPATH & "\Zeus\Prod\Prod1\Local Components", Destination:="C:\Users\" & Usr & "\Desktop\Zeus\Components"
+                FldrSetupSuccess = True
+            Else
+                FldrSetupSuccess = "Already Present"
+            End If
+
+Gifs:       On Error GoTo ERR_gifs
+            If Dir(ZeusPATH & "\Components\Gifs", vbDirectory) = vbNullString Then
+                Shell "wscript " & Chr(34) & CpyFldrScript & Chr(34) & " " & Chr(34) & SupplyNetPATH & "\Zeus\Prod\Prod1\Local Components\Gifs" & Chr(34) & " " & Chr(34) & ZeusPATH & "\Components\Gifs" & Chr(34)
+                'If Not Dir(ZeusPATH & "\Components\Gifs", vbDirectory) = vbNullString Then gifSuccess = True
+            Else
+                gifSuccess = "Already Present"
+            End If
+
+MstrTmplt:  On Error GoTo ERR_MstrTmplt
+            If Dir(TemplatePATH & "\" & MasterTemplate, vbDirectory) = vbNullString Then
+                Shell "wscript " & Chr(34) & CpyFileScript & Chr(34) & " " & Chr(34) & SupplyNetPATH & "\Zeus\Prod\Prod1\Local Components\Templates\" & MasterTemplate & Chr(34) & " " & Chr(34) & TemplatePATH & "\" & MasterTemplate & Chr(34)
+                'FileCopy SupplyNetPATH & "\Zeus\Prod\Prod1\Local Components\Templates\" & MasterTemplate, TemplatePATH & "\" & MasterTemplate
+                'MstrTmpltSuccess = True
+            Else
+                MstrTmpltSuccess = "Already Present"
+            End If
+
+BRDTmplt:   On Error GoTo ERR_BRDTmplt
+            If Dir(TemplatePATH & "\" & BRDTemplate, vbDirectory) = vbNullString Then
+                Shell "wscript " & Chr(34) & CpyFileScript & Chr(34) & " " & Chr(34) & SupplyNetPATH & "\Zeus\Prod\Prod1\Local Components\Templates\" & BRDTemplate & Chr(34) & " " & Chr(34) & TemplatePATH & "\" & BRDTemplate & Chr(34)
+                'FileCopy SupplyNetPATH & "\Zeus\Prod\Prod1\Local Components\Templates\" & BRDTemplate, TemplatePATH & "\" & BRDTemplate
+                'BRDTmpltSuccess = True
+            Else
+                BRDTmpltSuccess = "Already Present"
+            End If
+
+ScpGuide:   On Error GoTo ERR_ScpGuide
+            If Dir(ScopeguidePATH, vbDirectory) = vbNullString Then
+                Shell "wscript " & Chr(34) & CpyFileScript & Chr(34) & " " & Chr(34) & SupplyNetPATH & "\Analytics\DAT Resources\Scope Guide.accdb" & Chr(34) & " " & Chr(34) & ScopeguidePATH & Chr(34)
+                'FileCopy SupplyNetPATH & "\Analytics\DAT Resources\Scope Guide.accdb", ScopeguidePATH
+                'ScpGuideSuccess = True
+            Else
+                ScpGuideSuccess = "Already Present"
+            End If
+
+    ''kill other Zeus versions
+    ''===================================================================================================
+DltOtrs: On Error GoTo ERR_DltOtrs
+    Application.DisplayAlerts = False
+    Set zFSO = CreateObject("Scripting.FileSystemObject")
+    Set zFolder = zFSO.GetFolder("C:\Users\" & Usr & "\AppData\Roaming\Microsoft\Excel\XLSTART")
+    For Each zfile In zFolder.Files
+        On Error GoTo ERR_DltNxt
+        If InStr(zfile.Name, "Zeus") > 0 And Not InStr(zfile.Name, "Client") > 0 And Not InStr(zfile.Name, "DBA") > 0 And Not zfile.Name = AppNm Then
+            On Error Resume Next
+            Workbooks(zfile.Name).Close (False)
+            Kill zfile
+        End If
+DltNxt:
+    Next
+
+DltOld: On Error GoTo ERR_DltOld
+    Application.DisplayAlerts = False
+    Set zFSO = CreateObject("Scripting.FileSystemObject")
+    Set zFolder = zFSO.GetFolder("C:\Users\" & Usr & "\AppData\Roaming\Microsoft\AddIns")
+    For Each zfile In zFolder.Files
+        On Error GoTo ERR_DltNxt2
+        If InStr(zfile.Name, OldAppNm) > 0 Then
+            On Error Resume Next
+            Workbooks(zfile.Name).Close (False)
+            Kill zfile
+        End If
+DltNxt2:
+    Next
+
+UpdtStatus: On Error Resume Next
+    Application.StatusBar = False
+
+    If Not AppSuccess = "Already Present" Then
+
+        'calculate time elapsed
+        '=======================================================================================
+        ZeusEndTime = Time
+        ZeusTotalTime = DateDiff("s", ZeusStartTime, ZeusEndTime)
+        If ZeusTotalTime > 60 Then
+            mintime = Int(ZeusTotalTime / 60)
+            secTime = ZeusTotalTime Mod 60
+            timestr = mintime & "." & secTime & " minutes"
+            If mintime > 60 Then
+                hrtime = Int(mintime / 60)
+                mintime = mintime Mod 60
+                timestr = hrtime & "." & mintime & " hours"
+            End If
+        Else
+            timestr = ZeusTotalTime & " seconds"
+        End If
+
+        'Status Email
+        '=======================================================================================
+        On Error GoTo errhndlExitWithoutSend
+        eBODY = "<p><b><u>Success-or-Fail</u></b></p>" & _
+            "Folder Setup: " & FldrSetupSuccess & _
+            "<br>" & "Gifs: " & gifsSuccess & _
+            "<br>" & "Master Template: " & MstrTmpltSuccess & _
+            "<br>" & "Scopeguide: " & ScpGuideSuccess & _
+            "<br>" & "BRD Template: " & BRDTmpltSuccess & _
+            "<br>" & "App: " & AppSuccess & _
+            "<br>" & "Old App: " & OldAppSuccess & _
+            "<br>" & "Time Elapsed: " & timestr & _
+            "<br>" & addinfo & "--" & addinfo2 & _
+            "<p><b>" & Usr & "</b></p>"
+
+        Call MailMetrics("barry.forrest@vizientinc.com", "Zeus: Update-" & ThisWorkbook.Name, eBODY, "", "", 1)
+
+    End If
+
+EndClean:
+        On Error Resume Next
+        Workbooks(OldAppNm).Close
+
+Application.StatusBar = False
+Exit Sub
+':::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+ERR_NoPath:
+Resume NoPath
+NoPath:
+On Error Resume Next
+Call MailMetrics("barry.forrest@vizientinc.com", "Zeus: Update - Fail " & ThisWorkbook.Name & " [" & errbkmrk & "] " & Err.Description, "", "", "", 1)
+Resume EndClean
+
+ERR_NoWB:
+Resume OpenNew
+
+ERR_AppUpdate:
+Resume FldrSetup
+
+ERR_FldrSetup:
+Resume Gifs
+
+ERR_gifs:
+Resume MstrTmplt
+
+ERR_MstrTmplt:
+Resume BRDTmplt
+
+ERR_BRDTmplt:
+Resume ScpGuide
+
+ERR_ScpGuide:
+Resume DltOtrs
+
+errhndlExitWithoutSend:
+Exit Sub
+
+ERR_DltOtrs:
+Resume DltOld
+
+ERR_DltNxt:
+Resume DltNxt
+
+ERR_DltOld:
+Resume UpdtStatus
+
+ERR_DltNxt2:
+Resume DltNxt2
+
+
+
+End Sub
